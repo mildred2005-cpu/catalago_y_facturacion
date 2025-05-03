@@ -1,0 +1,5 @@
+Nombre: Juan Pérez
+Edad: 28
+Email: juan.perez@email.com
+Activo: Sí
+Habilidades: HTML, CSS, JavaScript
