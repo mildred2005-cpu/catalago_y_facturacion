@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Catálogo de Productos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/estilos.css">
+  <style>
+    body { font-family: sans-serif; margin: 0; background: #f4f4f4; }
+    header { background: #333; color: #fff; padding: 1rem; display: flex; justify-content: space-between; align-items: center; position: relative; }
+    header input { width: 300px; padding: 0.5rem; }
+    nav { background: #555; color: white; padding: 0.5rem; display: flex; gap: 1rem; }
+    nav button { background: transparent; color: white; border: none; cursor: pointer; }
+    .productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; padding: 1rem; }
+    .producto { background: white; padding: 1rem; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .producto img { width: 100%; height: 150px; object-fit: cover; }
+    .producto h3 { margin: 0.5rem 0; }
+    .producto button { background: green; color: white; border: none; padding: 0.5rem; cursor: pointer; }
+    #carrito-icono { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); background: white; color: black; padding: 0.5rem; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+    #carrito { position: fixed; top: 4rem; right: 1rem; background: white; padding: 1rem; border-radius: 5px; width: 250px; box-shadow: 0 0 10px rgba(0,0,0,0.2); display: none; z-index: 10; }
+    #carrito ul { list-style: none; padding: 0; }
+    #carrito p { font-weight: bold; }
+    footer { background: #333; color: white; text-align: center; padding: 1rem; margin-top: 2rem; }
+
+    /* Estilos para el panel de administrador */
+    #adminPanel { display: none; position: fixed; top: 60px; right: 10px; background: white; border: 1px solid #ccc; padding: 20px; width: 300px; height: 400px; overflow-y: auto; z-index: 1000; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
+    #adminPanel h3 { margin-top: 0; }
+    #adminPanel input[type="password"] { width: 100%; padding: 8px; margin-bottom: 10px; }
+    #adminPanel button { background: #333; color: white; border: none; padding: 8px 12px; cursor: pointer; }
+    #adminPanel button:hover { background: #555; }
+    #facturas pre { white-space: pre-wrap; font-family: inherit; background: #f9f9f9; padding: 10px; border-radius: 4px; }
+    #adminButton { position: fixed; top: 10px; right: 10px; background: #333; color: white; border: none; padding: 8px 12px; cursor: pointer; z-index: 1001; }
+    #adminButton:hover { background: #555; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Catálogo de Productos</h1>
+  <input type="text" id="buscador" placeholder="Buscar productos...">
+  <div id="carrito-icono" onclick="toggleCarrito()">🛒</div>
+</header>
+
+<nav id="categorias">
+  <button onclick="filtrarCategoria('todos')">Todos</button>
+  <button onclick="filtrarCategoria('tecnologia')">Tecnología</button>
+  <button onclick="filtrarCategoria('ropa')">Ropa</button>
+  <button onclick="filtrarCategoria('hogar')">Hogar</button>
+</nav>
+
+<main class="productos" id="lista-productos"></main>
+
+<aside id="carrito">
+  <h3>Carrito</h3>
+  <ul id="items-carrito"></ul>
+  <p id="total">Total: $0.00</p>
+  <div id="formulario-compra" style="margin-top: 10px;">
+    <input type="email" id="email-cliente" placeholder="Ingrese su email" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+    <button onclick="finalizarCompra()" style="width: 100%; padding: 8px; background: #333; color: white; border: none; cursor: pointer;">Finalizar Compra</button>
+  </div>
+</aside>
+
+<footer>
+  &copy; 2025 Mi Catálogo
+</footer>
+
+<!-- Botón y panel para administrador -->
+<button id="adminButton" onclick="mostrarAdmin()">Admin</button>
+
+<div id="adminPanel">
+  <h3>Historial de Facturas</h3>
+  <input type="password" id="adminClave" placeholder="Contraseña de administrador">
+  <button onclick="verHistorial()">Ver Historial</button>
+  <div id="facturas"></div>
+</div>
+
+<script>
+  // Datos de productos (podrían venir del backend)
+  const productos = [
+    { id: 1, nombre: 'Laptop', precio: 750, categoria: 'tecnologia', imagen: 'https://th.bing.com/th/id/OIP.I4l8I_2-rSgTn4b_a2lO_QHaD0?rs=1&pid=ImgDetMain' },
+    { id: 2, nombre: 'Camiseta', precio: 20, categoria: 'ropa', imagen: 'https://th.bing.com/th/id/OIP.O3XVw3CyxbVl2RRKLNv8LQHaE7?rs=1&pid=ImgDetMain' },
+    { id: 3, nombre: 'Silla', precio: 45, categoria: 'hogar', imagen: 'https://th.bing.com/th/id/OIP.uzRL8rRbJWd34SF3QCVzRwHaHa?rs=1&pid=ImgDetMain' },
+    { id: 4, nombre: 'Audífonos Inalámbricos', precio: 350, categoria: 'tecnologia', imagen: 'https://msldigital.com.my/wp-content/uploads/2023/08/385df812b2a2c3ea6c071afc7adaf5e4.jpeg' }
+  ];
+
+  const carrito = [];
+  let carritoVisible = false;
+
+  // Mostrar productos en el catálogo
+  function mostrarProductos(lista) {
+    const contenedor = document.getElementById('lista-productos');
+    contenedor.innerHTML = '';
+    lista.forEach(p => {
+      contenedor.innerHTML += `
+        <div class="producto">
+          <img src="${p.imagen}" alt="${p.nombre}">
+          <h3>${p.nombre}</h3>
+          <p>$${p.precio.toFixed(2)}</p>
+          <button onclick="agregarAlCarrito(${p.id})">Agregar</button>
+        </div>`;
+    });
+  }
+
+  // Agregar producto al carrito
+  function agregarAlCarrito(id) {
+    const prod = productos.find(p => p.id === id);
+    carrito.push(prod);
+    renderizarCarrito();
+    // Feedback visual
+    const carritoIcono = document.getElementById('carrito-icono');
+    carritoIcono.style.transform = 'translateY(-50%) scale(1.2)';
+    setTimeout(() => {
+      carritoIcono.style.transform = 'translateY(-50%) scale(1)';
+    }, 300);
+  }
+
+  // Renderizar el contenido del carrito
+  function renderizarCarrito() {
+    const lista = document.getElementById('items-carrito');
+    const total = document.getElementById('total');
+    lista.innerHTML = '';
+    let suma = 0;
+    carrito.forEach(p => {
+      lista.innerHTML += `<li>${p.nombre} - $${p.precio.toFixed(2)}</li>`;
+      suma += p.precio;
+    });
+    total.textContent = `Total: $${suma.toFixed(2)}`;
+  }
+
+  // Filtrar productos por categoría
+  function filtrarCategoria(cat) {
+    if (cat === 'todos') {
+      mostrarProductos(productos);
+    } else {
+      mostrarProductos(productos.filter(p => p.categoria === cat));
+    }
+  }
+
+  // Finalizar compra (envía datos al backend)
+  function finalizarCompra() {
+    if (carrito.length === 0) {
+      alert('El carrito está vacío');
+      return;
+    }
+
+    const email = document.getElementById('email-cliente').value;
+    if (!email || !email.includes('@')) {
+      alert('Por favor ingrese un email válido');
+      return;
+    }
+
+    let total = 0;
+    const detalle = carrito.map(p => {
+      total += p.precio;
+      return {
+        id: p.id,
+        nombre: p.nombre,
+        precio: p.precio
+      };
+    });
+
+    const datosCompra = {
+      email: email,
+      productos: detalle,
+      total: total,
+      fecha: new Date().toISOString()
+    };
+
+    // Enviar al backend
+    fetch('http://localhost:5000/compras', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(datosCompra)
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert('Compra realizada con éxito. Se ha enviado la factura a su email.');
+        carrito.length = 0; // Vaciar carrito
+        renderizarCarrito();
+        document.getElementById('email-cliente').value = '';
+      } else {
+        alert('Error al procesar la compra: ' + (data.error || 'Error desconocido'));
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error al conectar con el servidor');
+    });
+  }
+
+  // Mostrar/ocultar carrito
+  function toggleCarrito() {
+    carritoVisible = !carritoVisible;
+    document.getElementById('carrito').style.display = carritoVisible ? 'block' : 'none';
+  }
+
+  // Funcionalidad del panel de administrador
+  function mostrarAdmin() {
+    const panel = document.getElementById('adminPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function verHistorial() {
+    const clave = document.getElementById('adminClave').value;
+    if (!clave) {
+      document.getElementById('facturas').innerHTML = '<p style="color:red;">Ingrese la contraseña</p>';
+      return;
+    }
+
+    fetch(`http://localhost:5000/admin/facturas?clave=${encodeURIComponent(clave)}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Error en la respuesta del servidor');
+        return res.json();
+      })
+      .then(data => {
+        const contenedor = document.getElementById('facturas');
+        contenedor.innerHTML = '';
+        if (data.error) {
+          contenedor.innerHTML = `<p style="color: red;">${data.error}</p>`;
+          return;
+        }
+
+        if (data.length === 0) {
+          contenedor.innerHTML = '<p>No hay facturas registradas</p>';
+          return;
+        }
+
+        data.forEach((factura, index) => {
+          const div = document.createElement('div');
+          div.innerHTML = `<pre><strong>Factura ${index + 1}</strong>\n${factura}</pre><hr>`;
+          contenedor.appendChild(div);
+        });
+      })
+      .catch(err => {
+        document.getElementById('facturas').innerHTML = '<p style="color:red;">Error al obtener facturas: ' + err.message + '</p>';
+      });
+  }
+
+  // Event listeners
+  document.getElementById('buscador').addEventListener('input', e => {
+    const texto = e.target.value.toLowerCase();
+    mostrarProductos(productos.filter(p => p.nombre.toLowerCase().includes(texto)));
+  });
+
+  // Inicializar
+  mostrarProductos(productos);
+</script>
+
+</body>
+</html>
